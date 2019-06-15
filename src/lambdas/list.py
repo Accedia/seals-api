@@ -4,8 +4,7 @@ import boto3
 import json
 import urllib.parse
 
-def get(event, context):
-
+def list_all(event, context):
     secret_name = "MONGO_URI"
     region_name = "eu-west-1"
 
@@ -26,14 +25,39 @@ def get(event, context):
     password = urllib.parse.quote_plus(secret_value['password'])
     host = secret_value['host']
 
-    print(event)
-
     mongo_client = MongoClient('mongodb://%s:%s@%s:27017' % (username, password, host))
 
     db = mongo_client.seals
-    items = list(db.beaches.find({'point': event['pathParameters']['point']}))
-
-    print(items)
+    items = list(db.beaches.aggregate([
+        {
+            "$sort": {
+                "measurement_date": -1
+            }
+        },
+        {
+            "$group": {
+                "_id": "$point",
+                "name": {
+                    "$first": '$name'
+                },
+                "coord_x": {
+                    "$first": "$coord_x"
+                },
+                "coord_y": {
+                    "$first": "$coord_y"
+                },
+                "intestinal_enterococci": {
+                    "$first": "$intestinal_enterococci"
+                },
+                "ecoli": {
+                    "$first": "$ecoli"
+                },
+                "measurement_date": {
+                    "$first": "$measurement_date"
+                }
+            }
+        }
+    ]))
 
     return {
         'statusCode': 200,

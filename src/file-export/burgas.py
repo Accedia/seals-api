@@ -3,13 +3,11 @@ import shutil
 import urllib
 from datetime import datetime
 
-import PyPDF2
 import boto3
-import camelot #PDF table parsing libary
+import math
 import requests
 import pandas as pd
 import re
-import numpy as np
 from pymongo import MongoClient
 
 VARNA_FILE_NAME = "mvodi-2019.pdf"
@@ -33,7 +31,7 @@ def degreesToDecimal(lat, lon):
 
 
 def is_nan(x):
-    return (x is np.nan or x != x)
+    return (math.isnan(x) or x != x)
 
 
 def download(url, file_name):
@@ -137,11 +135,43 @@ def processBurgas(dataArray):
     return beaches
 
 
-download(BURGAS_URL, BURGAS_FILE_NAME)
+def lambda_handler():
+    download(BURGAS_URL, BURGAS_FILE_NAME)
 
-rawDataBurgas = extractXlsFile(BURGAS_FILE_NAME)
-burgasBeaches = processBurgas(rawDataBurgas)
+    rawDataBurgas = extractXlsFile(BURGAS_FILE_NAME)
+    burgasBeaches = processBurgas(rawDataBurgas)
 
-# INSERTTT----------------------------
+    # INSERTTT----------------------------
 
-print(burgasBeaches)
+    secret_name = "MONGO_URI"
+    region_name = "eu-west-1"
+
+    # Create a Secrets Manager client
+    session = boto3.session.Session()
+    client = session.client(
+        service_name='secretsmanager',
+        region_name=region_name
+    )
+
+    get_secret_value_response = client.get_secret_value(
+        SecretId=secret_name
+    )
+
+    secret_value = json.loads(get_secret_value_response['SecretString'])
+
+    username = urllib.parse.quote_plus(secret_value['username'])
+    password = urllib.parse.quote_plus(secret_value['password'])
+    host = secret_value['host']
+
+    print(host)
+
+    mongo_client = MongoClient('mongodb://%s:%s@%s:27017' % (username, password, host))
+
+    db = mongo_client.seals
+    db.beaches.insert_many(burgasBeaches)
+
+    print(burgasBeaches)
+
+    return {
+        'statusCode': 204
+    }

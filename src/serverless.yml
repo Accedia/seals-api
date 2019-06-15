@@ -12,11 +12,42 @@ provider:
 plugins:
   - serverless-python-requirements
 
+package:
+  exclude:
+    - venv/**
+
 functions:
   get:
     handler: lambdas/get.get
     events:
       - http:
+          path: beaches/{point}
+          method: get
+          cors:
+            origin: '*' # <-- Specify allowed origin
+            headers: # <-- Specify allowed headers
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: false
+  list:
+    handler: lambdas/list.list
+    events:
+      - http:
           path: beaches
           method: get
-          cors: true
+          cors:
+            origin: '*' # <-- Specify allowed origin
+            headers: # <-- Specify allowed headers
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: false
+  import_burgas:
+    handler: file-export/burgas.lambda_handler
