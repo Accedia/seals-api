@@ -1,2 +1,4 @@
 src/.serverless
 src/node_modules
+
+.idea
