@@ -37,5 +37,9 @@ def get(event, context):
 
     return {
         'statusCode': 200,
+        'headers': {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Credentials': 'true',
+        },
         'body': json.dumps(items, default=json_util.default)
     }
