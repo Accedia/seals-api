@@ -56,9 +56,9 @@ functions:
   import_burgas:
     handler: file-export/burgas.lambda_handler
     events:
-      - schedule: cron(0 * * * ? *)
+      - schedule: cron(0 16 ? * MON-FRI *)
   import_varna:
     handler: file-export/varna.lambda_handler
     timeout: 60
     events:
-      - schedule: cron(0 * * * ? *)
+      - schedule: cron(0 16 ? * MON-FRI *)
