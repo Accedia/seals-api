@@ -9,6 +9,7 @@ import requests
 import pandas as pd
 import re
 from pymongo import MongoClient
+from pymongo.errors import BulkWriteError
 
 VARNA_FILE_NAME = "mvodi-2019.pdf"
 VARNA_URL = "http://www.rzi-varna.com/health/mvodi-2019.pdf"
@@ -45,7 +46,6 @@ def download(url, file_name):
 def extractXlsFile(file_name):
     df = pd.read_excel(file_name, header=None)
     return df.values
-
 
 def procesMeasIndex(value):
     if isinstance(value, int):
@@ -135,10 +135,11 @@ def processBurgas(dataArray):
     return beaches
 
 
-def lambda_handler():
-    download(BURGAS_URL, BURGAS_FILE_NAME)
+def lambda_handler(event, context):
+    file_path = '/tmp/' + VARNA_FILE_NAME
+    download(BURGAS_URL, file_path)
 
-    rawDataBurgas = extractXlsFile(BURGAS_FILE_NAME)
+    rawDataBurgas = extractXlsFile(file_path)
     burgasBeaches = processBurgas(rawDataBurgas)
 
     # INSERTTT----------------------------
@@ -168,9 +169,10 @@ def lambda_handler():
     mongo_client = MongoClient('mongodb://%s:%s@%s:27017' % (username, password, host))
 
     db = mongo_client.seals
-    db.beaches.insert_many(burgasBeaches)
-
-    print(burgasBeaches)
+    try:
+        db.beaches.insert_many(burgasBeaches, ordered=False)
+    except BulkWriteError as bwe:
+        print(bwe.details)
 
     return {
         'statusCode': 204

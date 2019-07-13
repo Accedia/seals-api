@@ -12,6 +12,10 @@ provider:
 plugins:
   - serverless-python-requirements
 
+custom:
+  pythonRequirements:
+    dockerizePip: non-linux
+
 package:
   exclude:
     - venv/**
@@ -51,3 +55,10 @@ functions:
             allowCredentials: false
   import_burgas:
     handler: file-export/burgas.lambda_handler
+    events:
+      - schedule: cron(0 * * * ? *)
+  import_varna:
+    handler: file-export/varna.lambda_handler
+    timeout: 60
+    events:
+      - schedule: cron(0 * * * ? *)

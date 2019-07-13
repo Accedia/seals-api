@@ -1,8 +1,12 @@
 import json
 import shutil
+import urllib
 from datetime import datetime
 
 import requests
+import boto3
+from pymongo import MongoClient
+from pymongo.errors import BulkWriteError
 import re
 from tika import parser
 
@@ -65,7 +69,7 @@ def processFile(file_name):
             point = lineItems[i][pointIndex + 1: lineItems[i].index(' ', pointIndex + 2)].strip(' ').lstrip('.')
             nameIndex = lineItems[i].index('Наименование')
             name = lineItems[i][nameIndex + 12 : len(lineItems[i])].strip()
-        elif lineItems[i].startswith('стр.'):
+        elif lineItems[i].startswith('ДРУГИ ДОПЪЛНИТЕЛНО ИЗСЛЕДВАНИ ПРИ НЕОБХОДИМОСТ ПОКАЗАТЕЛИ'):
             for tr in tableResults:
                 coordinates = degreesToDecimal(coord_x, coord_y);
                 tr['coord_x'] = coordinates[0]
@@ -80,7 +84,46 @@ def processFile(file_name):
 
     return results
 
-download(VARNA_URL, VARNA_FILE_NAME)
-beaches_varna = processFile(VARNA_FILE_NAME)
-y = json.dumps(beaches_varna)
-print(y)
+def lambda_handler(event, context):
+    file_path = '/tmp/' + VARNA_FILE_NAME
+    download(VARNA_URL, file_path)
+    beaches_varna = processFile(file_path)
+
+    # y = json.dumps(beaches_varna)
+    # print(y)
+
+    # INSERTTT----------------------------
+
+    secret_name = "MONGO_URI"
+    region_name = "eu-west-1"
+
+    # Create a Secrets Manager client
+    session = boto3.session.Session()
+    client = session.client(
+        service_name='secretsmanager',
+        region_name=region_name
+    )
+
+    get_secret_value_response = client.get_secret_value(
+        SecretId=secret_name
+    )
+
+    secret_value = json.loads(get_secret_value_response['SecretString'])
+
+    username = urllib.parse.quote_plus(secret_value['username'])
+    password = urllib.parse.quote_plus(secret_value['password'])
+    host = secret_value['host']
+
+    print(host)
+
+    mongo_client = MongoClient('mongodb://%s:%s@%s:27017' % (username, password, host))
+
+    db = mongo_client.seals
+    try:
+        db.beaches.insert_many(beaches_varna, ordered=False)
+    except BulkWriteError as bwe:
+        print(bwe.details)
+
+    return {
+        'statusCode': 204
+    }
