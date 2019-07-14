@@ -145,7 +145,7 @@ def lambda_handler(event, context):
     # INSERTTT----------------------------
 
     secret_name = "MONGO_URI"
-    region_name = "eu-west-1"
+    region_name = "eu-central-1"
 
     # Create a Secrets Manager client
     session = boto3.session.Session()

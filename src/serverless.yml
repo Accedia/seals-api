@@ -2,7 +2,7 @@ service: seals-api
 
 provider:
   name: aws
-  region: eu-west-1
+  region: eu-central-1
   runtime: python3.6
   iamRoleStatements:
     - Effect: Allow
@@ -38,7 +38,7 @@ functions:
               - X-Amz-User-Agent
             allowCredentials: false
   list:
-    handler: lambdas/list.list
+    handler: lambdas/list.list_all
     events:
       - http:
           path: beaches
