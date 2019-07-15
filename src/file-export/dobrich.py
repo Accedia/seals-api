@@ -11,8 +11,8 @@ import re
 from pymongo import MongoClient
 from pymongo.errors import BulkWriteError
 
-BURGAS_FILE_NAME = "tablici_monitoring_moreMZ-2019.xls"
-BURGAS_URL = "http://www.rzi-burgas.com/Vodi/tablici_monitoring_moreMZ-2019.xls"
+DOBRICH_FILE_NAME = "RZI-Dobrich-morski_vodi_2019-Prilojenie2.xls"
+DOBRICH_URL = "http://www.rzi-dobrich.org/files/upload/zdraven-kontrol/kontrol-na-faktori-na-sredata/vodi/vodi-za-kupane/morski/vodi_kypane_2019/RZI-Dobrich-morski_vodi_2019-Prilojenie2.xls"
 
 
 def degreesToDecimal(lat, lon):
@@ -40,22 +40,26 @@ def download(url, file_name):
             shutil.copyfileobj(r.raw, f)
 
 
-def extractXlsFile(file_name):
-    df = pd.read_excel(file_name, header=None)
-    return df.values
+def extractXlsFileData(file_name):
+    xls = pd.ExcelFile(file_name)
+    result = []
+    for sheet_name in xls.sheet_names:
+        result += processDobrich(pd.read_excel(file_name, sheet_name=sheet_name).values)
+
+    return result
 
 def procesMeasIndex(value):
     if isinstance(value, int):
         return value
     elif value.isnumeric():
         return int(value)
-    elif value.startswith("под"):
+    elif value.startswith("под") or value.startswith('<'):
         return 10
     else:
         return 0
 
 def processMeasurement(row):
-    if is_nan(row[2]) & is_nan(row[3]):
+    if (type(row[2]) is not str and is_nan(row[2])) or (type(row[3]) is not str and is_nan(row[3])):
         return None
 
     date = row[1]
@@ -85,10 +89,19 @@ def processMeasurement(row):
 
 
 def processBeach(dataArray, rowIndex):
-    id = dataArray[rowIndex][2]
-    title = dataArray[rowIndex][5]
-    coordXStr = dataArray[rowIndex + 1][3]
-    coordYStr = dataArray[rowIndex + 1][5]
+    numIndex = dataArray[rowIndex][0].index('№') + 1
+    pointEndIndex = dataArray[rowIndex][0].index(' ', numIndex);
+    id = dataArray[rowIndex][0][numIndex:pointEndIndex];
+    titleStartIndex = dataArray[rowIndex][0].index('"') + 1;
+    titleEndIndex = dataArray[rowIndex][0].index('"', titleStartIndex)
+    title = dataArray[rowIndex][0][titleStartIndex:titleEndIndex]
+
+    coordXStartIndex = dataArray[rowIndex + 1][0].index('N ') + 2
+    coordXEndIndex = dataArray[rowIndex + 1][0].index('"', coordXStartIndex) + 1
+    coordYStartIndex = dataArray[rowIndex + 1][0].index('E ') + 2
+    coordYEndIndex = dataArray[rowIndex + 1][0].index('"', coordYStartIndex) + 1
+    coordXStr = dataArray[rowIndex + 1][0][coordXStartIndex:coordXEndIndex]
+    coordYStr = dataArray[rowIndex + 1][0][coordYStartIndex:coordYEndIndex]
 
     coordinates = degreesToDecimal(coordXStr, coordYStr);
 
@@ -105,6 +118,8 @@ def processBeach(dataArray, rowIndex):
     while m is not None:
         mArr.append(m)
         i+=1
+        if len(dataArray) <= i:
+            break
         m = processMeasurement(dataArray[i])
 
 
@@ -121,11 +136,11 @@ def processBeach(dataArray, rowIndex):
         })
     return result
 
-def processBurgas(dataArray):
+def processDobrich(dataArray):
     i = 0
     beaches = []
     while i<len(dataArray):
-        if dataArray[i][0] == 'ПУНКТ ЗА ВЗЕМАНЕ НА ПРОБИ №':
+        if type(dataArray[i][0]) is str and dataArray[i][0].startswith('Пункт за вземане на проби №'):
             b = processBeach(dataArray,i)
             beaches += b
         i += 1
@@ -133,11 +148,10 @@ def processBurgas(dataArray):
 
 
 def lambda_handler(event, context):
-    file_path = '/tmp/' + BURGAS_FILE_NAME
-    download(BURGAS_URL, file_path)
+    file_path = '/tmp/' + DOBRICH_FILE_NAME
+    download(DOBRICH_URL, file_path)
 
-    rawDataBurgas = extractXlsFile(file_path)
-    burgasBeaches = processBurgas(rawDataBurgas)
+    dobrichBeaches = extractXlsFileData(file_path)
 
     # INSERTTT----------------------------
 
@@ -167,7 +181,7 @@ def lambda_handler(event, context):
 
     db = mongo_client.seals
     try:
-        db.beaches.insert_many(burgasBeaches, ordered=False)
+        db.beaches.insert_many(dobrichBeaches, ordered=False)
     except BulkWriteError as bwe:
         print(bwe.details)
 

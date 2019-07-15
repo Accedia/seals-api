@@ -57,6 +57,10 @@ functions:
     handler: file-export/burgas.lambda_handler
     events:
       - schedule: cron(0 16 ? * MON-FRI *)
+  import_dobrich:
+    handler: file-export/dobrich.lambda_handler
+    events:
+      - schedule: cron(0 16 ? * MON-FRI *)
   import_varna:
     handler: file-export/varna.lambda_handler
     timeout: 60
